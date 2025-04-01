@@ -173,29 +173,29 @@ with tab1:
     st.subheader("ETF seleccionado", selected_benchmark)
 
     # Crear gráfico de mapa global basado en el ETF seleccionado
-    if selected_benchmark in etf_country_data:
+    #if selected_benchmark in etf_country_data:
      # Para los ETFs, usar los datos específicos de países
-        df_countries = pd.DataFrame(etf_country_data[selected_benchmark], columns=['Country'])
-        fig = px.scatter_geo(
-            df_countries,
-            locations='Country',
-            locationmode='country names',
-            hover_name='Country',
-            title=f'Países de Inversión del ETF: {selected_benchmark} (solo funciona para los ETF dados por nosotros)',
-            projection='natural earth',
-            template='plotly_dark',
-        )
+        #df_countries = pd.DataFrame(etf_country_data[selected_benchmark], columns=['Country'])
+        #fig = px.scatter_geo(
+            #df_countries,
+            #locations='Country',
+            #locationmode='country names',
+            #hover_name='Country',
+            #title=f'Países de Inversión del ETF: {selected_benchmark} (solo funciona para los ETF dados por nosotros)',
+            #projection='natural earth',
+            #template='plotly_dark',
+        #)
 
         # Actualizar trazos del gráfico
-        fig.update_traces(marker=dict(size=10, color='#00ff00', line=dict(width=2, color='DarkSlateGrey')))
-        fig.update_geos(
-            showland=True, landcolor="#e6e6e6",
-            showocean=True, oceancolor="#333333",
-            showcountries=True, countrycolor="#ffffff"
-        )
+        #fig.update_traces(marker=dict(size=10, color='#00ff00', line=dict(width=2, color='DarkSlateGrey')))
+        #fig.update_geos(
+            #showland=True, landcolor="#e6e6e6",
+            #showocean=True, oceancolor="#333333",
+            #showcountries=True, countrycolor="#ffffff"
+        #)
 
         # Mostrar gráfico
-        st.plotly_chart(fig)
+        #st.plotly_chart(fig)
     #benchmark
     all_symbols = simbolos + [benchmark]
     df_stocks = obtener_datos(all_symbols)
