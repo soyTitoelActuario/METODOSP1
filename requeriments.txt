@@ -5,3 +5,7 @@ numpy
 scipy
 yfinance
 matplotlib
+xlrd
+exchange_calendars
+openpyxl
+yfinance
