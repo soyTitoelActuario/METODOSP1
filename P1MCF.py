@@ -83,12 +83,91 @@ def calcular_metricas(df):
 def obtener_datos_acciones(simbolos, start_date, end_date):
     data = yf.download(simbolos, start=start_date, end=end_date)['Close']
     return data.ffill().dropna()
+
+def calcular_var(returns, alpha=0.95):
+    """
+    Calcula el VaR paramétrico basado en la distribución normal.
+    """
+    mean = np.mean(returns)
+    std_dev = np.std(returns)
+    var = norm.ppf(1 - alpha, mean, std_dev)
+    return var
+
+def calcular_cvar(returns, alpha=0.95):
+    """
+    Calcula el CVaR (Expected Shortfall) usando datos históricos.
+    """
+    var = np.percentile(returns, (1 - alpha) * 100)
+    cvar = returns[returns <= var].mean()
+    return cvar
+
+def kupiec_test(violations, total_days, confidence_level):
+    """
+    Prueba de Kupiec para evaluar la precisión del VaR.
+    
+    :param violations: Número de veces que las pérdidas superaron el VaR.
+    :param total_days: Total de días en la muestra.
+    :param confidence_level: Nivel de confianza utilizado en el VaR.
+    :return: Valor p de la prueba de Kupiec.
+    """
+    p_hat = violations / total_days
+    p_var = 1 - confidence_level
+    likelihood_ratio = -2 * np.log(((1 - p_var) ** (total_days - violations) * (p_var ** violations)) /
+                                   ((1 - p_hat) ** (total_days - violations) * (p_hat ** violations)))
+    p_value = 1 - stats.chi2.cdf(likelihood_ratio, df=1)
+    return p_value
+    
+def christoffersen_test(violations_sequence):
+    """
+    Prueba de Christoffersen para evaluar la independencia de violaciones del VaR.
+    
+    :param violations_sequence: Lista de 0 (sin violación) y 1 (con violación).
+    :return: Valor p de la prueba de Christoffersen.
+    """
+    n00 = sum(1 for i in range(1, len(violations_sequence)) if violations_sequence[i] == 0 and violations_sequence[i-1] == 0)
+    n01 = sum(1 for i in range(1, len(violations_sequence)) if violations_sequence[i] == 1 and violations_sequence[i-1] == 0)
+    n10 = sum(1 for i in range(1, len(violations_sequence)) if violations_sequence[i] == 0 and violations_sequence[i-1] == 1)
+    n11 = sum(1 for i in range(1, len(violations_sequence)) if violations_sequence[i] == 1 and violations_sequence[i-1] == 1)
+
+    p1 = n01 / (n00 + n01) if (n00 + n01) > 0 else 0
+    p2 = n11 / (n10 + n11) if (n10 + n11) > 0 else 0
+
+    likelihood_ratio = -2 * np.log(((1 - p1) ** n00 * p1 ** n01 * (1 - p2) ** n10 * p2 ** n11) /
+                                   (((n01 + n11) / (n00 + n01 + n10 + n11)) ** (n01 + n11) *
+                                    ((n00 + n10) / (n00 + n01 + n10 + n11)) ** (n00 + n10)))
+    p_value = 1 - stats.chi2.cdf(likelihood_ratio, df=1)
+    return p_value
+
+def backtesting_var(returns, var_series, confidence_level=0.95):
+    """
+    Evalúa los métodos de VaR mediante backtesting con pruebas de Kupiec y Christoffersen.
+    
+    :param returns: Serie de rendimientos.
+    :param var_series: Serie de valores de VaR estimados.
+    :param confidence_level: Nivel de confianza usado en el VaR.
+    """
+    violations = returns < var_series
+    num_violations = violations.sum()
+    total_days = len(returns)
+    violations_sequence = violations.astype(int).tolist()
+
+    kupiec_p = kupiec_test(num_violations, total_days, confidence_level)
+    christoffersen_p = christoffersen_test(violations_sequence)
+
+    return {
+        "Total Violations": num_violations,
+        "Kupiec p-value": kupiec_p,
+        "Christoffersen p-value": christoffersen_p
+    }
+
+
+
 ##finfunciones
 # Configuración de la página
     # Configuración de la página
 st.set_page_config(page_title="Metricas de acciones", layout="wide")
 # Crear pestañas
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Metricas básicas y rendimientos", "Var & cVaR", "Rolling Windows", "Violaciones", "VaR Volatilidad Móvil"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Metricas básicas y rendimientos", "Var & cVaR",  "Violaciones", "VaR Volatilidad Móvil"])
 st.sidebar.title("Analizador de Métricas")
 simbolos_input = st.sidebar.text_input("Ingrese los símbolos de las acciones separados por comas (por ejemplo: AAPL,GOOGL,MSFT):", "AAPL,GOOGL,MSFT,AMZN,NVDA")
 simbolos = [s.strip() for s in simbolos_input.split(',')]
@@ -169,34 +248,6 @@ with tab1:
         'ACWI': ['Global']
     }
     
-    # Mostrar el ETF seleccionado en un metric
-    st.subheader("ETF seleccionado", selected_benchmark)
-
-    # Crear gráfico de mapa global basado en el ETF seleccionado
-    #if selected_benchmark in etf_country_data:
-     # Para los ETFs, usar los datos específicos de países
-        #df_countries = pd.DataFrame(etf_country_data[selected_benchmark], columns=['Country'])
-        #fig = px.scatter_geo(
-            #df_countries,
-            #locations='Country',
-            #locationmode='country names',
-            #hover_name='Country',
-            #title=f'Países de Inversión del ETF: {selected_benchmark} (solo funciona para los ETF dados por nosotros)',
-            #projection='natural earth',
-            #template='plotly_dark',
-        #)
-
-        # Actualizar trazos del gráfico
-        #fig.update_traces(marker=dict(size=10, color='#00ff00', line=dict(width=2, color='DarkSlateGrey')))
-        #fig.update_geos(
-            #showland=True, landcolor="#e6e6e6",
-            #showocean=True, oceancolor="#333333",
-            #showcountries=True, countrycolor="#ffffff"
-        #)
-
-        # Mostrar gráfico
-        #st.plotly_chart(fig)
-    #benchmark
     all_symbols = simbolos + [benchmark]
     df_stocks = obtener_datos(all_symbols)
     returns, cumulative_returns, normalized_prices = calcular_metricas(df_stocks)
@@ -313,3 +364,43 @@ with tab2:
 
     else:
         st.write("Seleccione un activo para visualizar sus métricas de riesgo.")
+        st.write("Seleccione un activo para visualizar sus métricas de riesgo.")
+
+
+# Evaluación de eficiencia de VaR (Inciso d)
+with tab3:
+    st.header("Evaluación de eficiencia de VaR")
+    alpha = st.selectbox("Seleccione nivel de confianza", [0.95, 0.975, 0.99], index=0)
+    selected_asset = st.selectbox("Seleccione un activo", simbolos)
+    df_rendimientos = calcular_rendimientos(df_precios[selected_asset])
+
+    VaR = calcular_var(df_rendimientos, alpha)
+    violaciones = df_rendimientos[df_rendimientos < VaR]
+    porcentaje_violaciones = len(violaciones) / len(df_rendimientos) * 100
+
+    st.metric("VaR estimado", f"{VaR:.4%}")
+    st.metric("Número de violaciones", f"{len(violaciones)}")
+    st.metric("Porcentaje de violaciones", f"{porcentaje_violaciones:.2f}%")
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(df_rendimientos.index, df_rendimientos, label="Rendimientos", color='blue')
+    ax.axhline(y=VaR, color='red', linestyle='--', label=f'VaR {int(alpha*100)}%')
+    ax.scatter(violaciones.index, violaciones, color='red', label='Violaciones', zorder=3)
+    ax.legend()
+    st.pyplot(fig)
+
+# Rolling Windows para VaR y CVaR (Inciso e)
+with tab5:
+    st.header("VaR y CVaR con Ventana Móvil")
+    window_size = st.slider("Seleccione tamaño de la ventana", 20, 252, 60)
+    df_rolling_var = df_rendimientos.rolling(window=window_size).apply(lambda x: calcular_var(x, alpha), raw=True)
+    df_rolling_cvar = df_rendimientos.rolling(window=window_size).apply(lambda x: calcular_cvar(x, alpha), raw=True)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(df_rolling_var, label=f"Rolling VaR {int(alpha*100)}%", color='red')
+    ax.plot(df_rolling_cvar, label=f"Rolling CVaR {int(alpha*100)}%", color='purple')
+    ax.legend()
+    st.pyplot(fig)
+
+
+
