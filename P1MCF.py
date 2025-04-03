@@ -167,7 +167,7 @@ def backtesting_var(returns, var_series, confidence_level=0.95):
     # Configuración de la página
 st.set_page_config(page_title="Metricas de acciones", layout="wide")
 # Crear pestañas
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Metricas básicas y rendimientos", "Var & cVaR",  "Violaciones", "VaR Volatilidad Móvil"])
+tab1, tab2, tab3, tab4 = st.tabs(["Metricas básicas y rendimientos", "Var & cVaR",  "Violaciones", "VaR Volatilidad Móvil"])
 st.sidebar.title("Analizador de Métricas")
 simbolos_input = st.sidebar.text_input("Ingrese los símbolos de las acciones separados por comas (por ejemplo: AAPL,GOOGL,MSFT):", "AAPL,GOOGL,MSFT,AMZN,NVDA")
 simbolos = [s.strip() for s in simbolos_input.split(',')]
@@ -184,20 +184,7 @@ benchmark = benchmark_options[selected_benchmark]
 
 #para las ventanas
 # Selección de la ventana de tiempo
-end_date = datetime.now()
-# Opciones de inicio para distintos periodos
-start_date_options = {
-    "1 mes": end_date - timedelta(days=30),
-    "3 meses": end_date - timedelta(days=90),
-    "6 meses": end_date - timedelta(days=180),
-    "1 año": end_date - timedelta(days=365),
-    "3 años": end_date - timedelta(days=3*365),
-    "5 años": end_date - timedelta(days=5*365),
-    "10 años": end_date - timedelta(days=10*365),
-    "Máximo": None  # Para descargar todos los datos disponibles
-}
-selected_window = st.sidebar.selectbox("Seleccione la ventana de tiempo para el análisis:", list(start_date_options.keys()))
-start_date = start_date_options[selected_window]
+
 
 # Hoja 1
 with tab1:
@@ -292,26 +279,26 @@ with tab2:
     alpha = alpha_options[selected_alpha_label]
     
     # El percentil para el cálculo del VaR
-    percentil = 100 - alpha * 100
+    percentil = alpha * 100  
 
     if selected_asset:
         mean = np.mean(df_rendimientos[selected_asset])
         stdev = np.std(df_rendimientos[selected_asset])
         
         # Paramétrico (Normal) VaR
-        VaR_param = norm.ppf(1 - alpha, mean, stdev)
+        VaR_param = -norm.ppf(alpha, mean, stdev) 
         
         # Historical VaR
-        hVaR = df_rendimientos[selected_asset].quantile(1 - alpha)
+        hVaR = -df_rendimientos[selected_asset].quantile(1 - alpha)  
         
         # Monte Carlo VaR
         n_sims = 100000
         np.random.seed(42)  # Para reproducibilidad
         sim_returns = np.random.normal(mean, stdev, n_sims)
-        MCVaR = np.percentile(sim_returns, percentil)
+        MCVaR = -np.percentile(sim_returns, 100 - percentil)  
         
         # CVaR (Expected Shortfall)
-        CVaR = df_rendimientos[selected_asset][df_rendimientos[selected_asset] <= hVaR].mean()
+        CVaR = -df_rendimientos[selected_asset][df_rendimientos[selected_asset] <= -hVaR].mean()  
         
         # Mostrar métricas en Streamlit
         st.subheader("Métricas de riesgo")
@@ -322,6 +309,13 @@ with tab2:
         col3.metric(f"{int(alpha*100)}% VaR (Monte Carlo)", f"{MCVaR:.4%}")
         col4.metric(f"{int(alpha*100)}% CVaR", f"{CVaR:.4%}")
         
+        # Verificación de cálculos
+        st.write("### Verificación de Cálculos:")
+        st.write(f"VaR Paramétrico: {VaR_param:.4%}")
+        st.write(f"VaR Histórico: {hVaR:.4%}")
+        st.write(f"VaR Monte Carlo: {MCVaR:.4%}")
+        st.write(f"CVaR: {CVaR:.4%}")
+        
         # Visualización gráfica
         st.subheader("Gráfica métricas de riesgo")
         
@@ -331,27 +325,26 @@ with tab2:
         # Generar histograma
         n, bins, patches = ax.hist(df_rendimientos[selected_asset], bins=50, color='blue', alpha=0.7, label='Returns')
         
-        # Identificar y colorear de rojo las barras a la izquierda de hVaR
+        # Identificar y colorear de rojo las barras a la izquierda de -hVaR
         for bin_left, bin_right, patch in zip(bins, bins[1:], patches):
-            if bin_left < hVaR:
+            if bin_left < -hVaR:
                 patch.set_facecolor('red')
         
         # Marcar las líneas de VaR y CVaR
-        ax.axvline(x=VaR_param, color='skyblue', linestyle='--', label=f'VaR {int(alpha*100)}% (Paramétrico)')
-        ax.axvline(x=MCVaR, color='grey', linestyle='--', label=f'VaR {int(alpha*100)}% (Monte Carlo)')
-        ax.axvline(x=hVaR, color='green', linestyle='--', label=f'VaR {int(alpha*100)}% (Histórico)')
-        ax.axvline(x=CVaR, color='purple', linestyle='-.', label=f'CVaR {int(alpha*100)}%')
+        ax.axvline(x=-VaR_param, color='skyblue', linestyle='--', label=f'VaR {int(alpha*100)}% (Paramétrico)')
+        ax.axvline(x=-MCVaR, color='grey', linestyle='--', label=f'VaR {int(alpha*100)}% (Monte Carlo)')
+        ax.axvline(x=-hVaR, color='green', linestyle='--', label=f'VaR {int(alpha*100)}% (Histórico)')
+        ax.axvline(x=-CVaR, color='purple', linestyle='-.', label=f'CVaR {int(alpha*100)}%')
         
         # Configurar etiquetas y leyenda
         ax.set_title(f"Histograma de Rendimientos con VaR y CVaR para {selected_asset}")
         ax.set_xlabel("Rendimiento Diario")
         ax.set_ylabel("Frecuencia")
         ax.legend()
-        
-        # Mostrar la figura en Streamlit
+
         st.pyplot(fig)
         
-        # Agregar explicación básica
+        # explicación básica
         with st.expander("¿Qué significan estas métricas?"):
             st.write(f"""
             - **VaR {int(alpha*100)}%**: Con un nivel de confianza del {int(alpha*100)}%, se espera que la pérdida máxima diaria no exceda este valor.
@@ -390,7 +383,7 @@ with tab3:
     st.pyplot(fig)
 
 # Rolling Windows para VaR y CVaR (Inciso e)
-with tab5:
+with tab4:
     st.header("VaR y CVaR con Ventana Móvil")
     window_size = st.slider("Seleccione tamaño de la ventana", 20, 252, 60)
     df_rolling_var = df_rendimientos.rolling(window=window_size).apply(lambda x: calcular_var(x, alpha), raw=True)
