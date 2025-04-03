@@ -1,6 +1,6 @@
 import streamlit as st
-import plotly as go
-import plotly as px
+import plotly.graph_objects as go
+import plotly.express as px
 from datetime import datetime, timedelta
 from scipy.optimize import minimize
 import pandas as pd
