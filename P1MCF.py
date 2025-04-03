@@ -173,7 +173,7 @@ st.set_page_config(page_title="Metricas de acciones", layout="wide")
 # Crear pestañas
 tab1, tab2, tab3, tab4  = st.tabs(["Metricas básicas y rendimientos", "Var & cVaR",  "Violaciones", "VaR Volatilidad Móvil"])
 st.sidebar.title("Analizador de Métricas")
-simbolos_input = st.sidebar.text_input("Ingrese los símbolos de las acciones separados por comas (por ejemplo: AAPL,GOOGL,MSFT):", "NVDAgt")
+simbolos_input = st.sidebar.text_input("Ingrese los símbolos de las acciones separados por comas (por ejemplo: AAPL,GOOGL,MSFT):", "NVDA")
 simbolos = [s.strip() for s in simbolos_input.split(',')]
 # Selección del benchmark para Luis
 benchmark_options = {
